@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>کارگاه قطعه‌شویی الهائی</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.4/Vazirmatn-font-face.css">
+  <style>
+    :root {
+      --industrial-bg: #1e1e1e;
+      --industrial-card: #2d2d2d;
+      --industrial-accent: #ff6200;
+      --industrial-accent-dark: #d94f00;
+      --industrial-text: #e0e0e0;
+      --industrial-border: #444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Vazirmatn', system-ui, sans-serif; background: var(--industrial-bg); color: var(--industrial-text); min-height: 100vh; padding: 16px; line-height: 1.6; }
+    .container { max-width: 900px; margin: 0 auto; background: var(--industrial-card); border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid var(--industrial-border); }
+    h1, h2, h3 { color: var(--industrial-accent); margin-bottom: 16px; }
+    h1 { font-size: 1.8rem; } h2 { font-size: 1.5rem; } h3 { font-size: 1.3rem; }
+    input, select, button { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--industrial-border); background: #333; color: var(--industrial-text); font-size: 1rem; font-family: inherit; margin: 4px 0; }
+    input:focus, select:focus { outline: none; border-color: var(--industrial-accent); box-shadow: 0 0 0 3px rgba(255,98,0,0.25); }
+    button { background: var(--industrial-accent); color: white; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+    button:hover { background: var(--industrial-accent-dark); transform: translateY(-1px); }
+    button.delete { background: #c0392b; }
+    button.delete:hover { background: #a93226; }
+    button.back { background: #555; }
+    button.back:hover { background: #444; }
+    .section { margin: 32px 0; }
+    .item { background: #383838; border: 1px solid var(--industrial-border); border-radius: 10px; padding: 16px; margin: 12px 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+    .item > div { flex: 1 1 200px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; background: #2a2a2a; }
+    th, td { padding: 12px; text-align: right; border: 1px solid var(--industrial-border); }
+    th { background: #444; color: var(--industrial-accent); }
+    #invoice { background: white; color: black; padding: 24px; border-radius: 8px; direction: rtl; font-family: 'Vazirmatn', sans-serif; display: none; }
+    #invoice h2 { color: #000; text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; }
+    #total-debt, #inv-total-debt { font-size: 1.4rem; font-weight: bold; color: #ff6200; }
+    .search-results div { padding: 10px; background: #333; margin: 6px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+    @media print { body > *:not(#invoice) { display: none !important; } #invoice { display: block !important; } }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0b2b4a; color: #fff; padding: 12px 24px; border-radius: 12px; font-size: 14px; z-index: 999; display: none; text-align: center; max-width: 90%; }
+  </style>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <div class="container" id="main-page">
+    <h1>کارگاه قطعه‌شویی الهائی</h1>
+    <h2>جمع بدهی مشتریان: <span id="total-debt">0</span> تومان</h2>
+
+    <div class="section">
+      <h3>اضافه کردن مشتری جدید</h3>
+      <input type="text" id="new-customer-name" placeholder="نام مشتری" />
+      <input type="tel" id="new-customer-phone" placeholder="شماره موبایل" />
+      <button onclick="addCustomer()">ثبت مشتری</button>
+    </div>
+
+    <div class="section">
+      <h3>جستجوی مشتری</h3>
+      <input type="text" id="search-customer" placeholder="نام مشتری را وارد کنید..." oninput="searchCustomer()" />
+      <div id="search-results" class="search-results"></div>
+    </div>
+
+    <div class="section">
+      <h3>لیست مشتریان</h3>
+      <div id="customers-list"></div>
+    </div>
+
+    <div class="section">
+      <h3>ذخیره و بازیابی اطلاعات</h3>
+      <button onclick="exportAllData()">📤 خروجی JSON</button>
+      <input type="file" id="import-file" accept=".json" style="display:inline-block;width:auto;"/>
+      <button onclick="importAllData()">📥 ورودی JSON</button>
+      <button onclick="saveToJsonBin()" style="background:#0b2b4a;">💾 ذخیره در ابر</button>
+      <button onclick="loadFromJsonBin()" style="background:#0b2b4a;">📥 بارگذاری از ابر</button>
+    </div>
+  </div>
+
+  <div class="container" id="customer-page" style="display:none;">
+    <button class="back" onclick="backToMain()">← بازگشت به صفحه اصلی</button>
+    <h1>مشتری: <span id="customer-name"></span></h1>
+
+    <div class="section">
+      <h3>ثبت موتور / قطعه جدید</h3>
+      <input type="text" id="new-engine-desc" placeholder="توضیح موتور / قطعه" />
+      <input type="number" id="new-engine-price" placeholder="مبلغ (تومان)" min="0" />
+      <select id="new-engine-sent">
+        <option value="false">ارسال نشده</option>
+        <option value="true">ارسال شده</option>
+      </select>
+      <select id="new-engine-paid">
+        <option value="false">پرداخت نشده</option>
+        <option value="true">پرداخت شده</option>
+      </select>
+      <button onclick="addEngine()">ثبت</button>
+    </div>
+
+    <div class="section">
+      <h3>لیست موتورها / قطعات</h3>
+      <div id="engines-list"></div>
+    </div>
+
+    <div class="section">
+      <button onclick="printInvoice()">چاپ فاکتور</button>
+      <button onclick="saveAsImage()">ذخیره به صورت تصویر</button>
+    </div>
+
+    <div id="invoice">
+      <h2>فاکتور مشتری: <span id="inv-customer-name"></span></h2>
+      <p style="text-align:center; font-size:1.1rem;">شماره فاکتور: <strong id="inv-number"></strong></p>
+      <table>
+        <thead><tr><th>ردیف</th><th>شرح</th><th>مبلغ (تومان)</th><th>ارسال</th><th>پرداخت</th></tr></thead>
+        <tbody id="invoice-body"></tbody>
+      </table>
+      <p style="margin-top:24px; font-size:1.2rem; text-align:left;">
+        <strong>شماره کارت:</strong> 5022291503985093<br>
+        <strong>به نام:</strong> رضا الهایی
+      </p>
+      <p style="font-size:1.4rem; margin-top:24px; text-align:right;">
+        مجموع بدهی: <span id="inv-total-debt">0</span> تومان
+      </p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const STORAGE_KEY = 'customers';
+    const INVOICE_KEY = 'invoiceCounter';
+    const JSONBIN_KEY = "688d117bae596e708fbf935f";
+    const BIN_ID = "67a8b1e8e41b4d34e4b4c4b4"; // این رو با Bin ID خودت عوض کن
+
+    let customers = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let currentCustomerId = null;
+    let invoiceCounter = parseInt(localStorage.getItem(INVOICE_KEY) || '1');
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+      localStorage.setItem(INVOICE_KEY, String(invoiceCounter));
+    }
+
+    async function saveToJsonBin() {
+      try {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Master-Key': JSONBIN_KEY
+          },
+          body: JSON.stringify({ customers, invoiceCounter })
+        });
+        if (res.ok) {
+          showToast("✅ اطلاعات در ابر ذخیره شد!");
+        } else {
+          showToast("❌ خطا در ذخیره در ابر");
+        }
+      } catch (e) {
+        console.error(e);
+        showToast("❌ خطا در ارتباط با ابر");
+      }
+    }
+
+    async function loadFromJsonBin() {
+      try {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+          headers: { 'X-Master-Key': JSONBIN_KEY }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const record = data.record;
+          if (record.customers) {
+            customers.splice(0, customers.length, ...record.customers);
+          }
+          if (typeof record.invoiceCounter === 'number') {
+            invoiceCounter = record.invoiceCounter;
+          }
+          saveData();
+          renderCustomers();
+          showToast("✅ اطلاعات از ابر بارگذاری شد!");
+        } else {
+          showToast("❌ خطا در بارگذاری از ابر");
+        }
+      } catch (e) {
+        console.error(e);
+        showToast("❌ خطا در ارتباط با ابر");
+      }
+    }
+
+    function exportAllData() {
+      const data = { customers, invoiceCounter };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('✅ فایل JSON ذخیره شد!');
+    }
+
+    function importAllData() {
+      const input = document.getElementById('import-file');
+      const file = input.files && input.files[0];
+      if (!file) return alert('یک فایل JSON انتخاب کنید');
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (Array.isArray(data.customers)) {
+            customers.splice(0, customers.length, ...data.customers);
+          }
+          if (typeof data.invoiceCounter === 'number') {
+            invoiceCounter = data.invoiceCounter;
+          }
+          saveData();
+          renderCustomers();
+          if (currentCustomerId && !customers.some(c => c.id === currentCustomerId)) {
+            currentCustomerId = null;
+          }
+          alert('✅ اطلاعات با موفقیت بارگذاری شد');
+          input.value = '';
+        } catch (e) {
+          alert('❌ فایل معتبر نیست');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function calcTotalDebt() {
+      let sum = 0;
+      customers.forEach(c => {
+        c.engines.forEach(e => {
+          if (!e.paid) sum += e.price;
+        });
+      });
+      document.getElementById('total-debt').textContent = sum.toLocaleString('fa-IR');
+    }
+
+    function renderCustomers(filter = '') {
+      const list = document.getElementById('customers-list');
+      list.innerHTML = '';
+      customers
+        .filter(c => c.name.toLowerCase().includes(filter.toLowerCase()))
+        .forEach(c => {
+          let debt = c.engines.reduce((s, e) => s + (!e.paid ? e.price : 0), 0);
+          const item = document.createElement('div');
+          item.className = 'item';
+          item.innerHTML = `
+            <div><strong>${c.name}</strong></div>
+            <div>${c.phone}</div>
+            <div>بدهی: ${debt.toLocaleString('fa-IR')} تومان</div>
+            <div class="actions">
+              <button onclick="goToCustomer(${c.id})">ورود</button>
+              <button class="delete" onclick="deleteCustomer(${c.id})">حذف</button>
+            </div>
+          `;
+          list.appendChild(item);
+        });
+      calcTotalDebt();
+    }
+
+    function addCustomer() {
+      const name = document.getElementById('new-customer-name').value.trim();
+      const phone = document.getElementById('new-customer-phone').value.trim();
+      if (!name || !phone) return alert('نام و شماره موبایل الزامی است');
+      const id = Date.now();
+      customers.push({ id, name, phone, engines: [] });
+      saveData();
+      renderCustomers();
+      document.getElementById('new-customer-name').value = '';
+      document.getElementById('new-customer-phone').value = '';
+    }
+
+    function deleteCustomer(id) {
+      if (!confirm('مطمئن هستید؟')) return;
+      const idx = customers.findIndex(c => c.id === id);
+      if (idx > -1) customers.splice(idx, 1);
+      saveData();
+      renderCustomers();
+    }
+
+    function searchCustomer() {
+      const q = document.getElementById('search-customer').value;
+      renderCustomers(q);
+    }
+
+    function goToCustomer(id) {
+      currentCustomerId = id;
+      const c = customers.find(x => x.id === id);
+      document.getElementById('customer-name').textContent = c.name;
+      document.getElementById('main-page').style.display = 'none';
+      document.getElementById('customer-page').style.display = 'block';
+      renderEngines();
+      checkOverdue(c);
+    }
+
+    function backToMain() {
+      document.getElementById('customer-page').style.display = 'none';
+      document.getElementById('main-page').style.display = 'block';
+      renderCustomers();
+    }
+
+    function renderEngines() {
+      const c = customers.find(x => x.id === currentCustomerId);
+      const list = document.getElementById('engines-list');
+      list.innerHTML = '';
+      c.engines.forEach((e, i) => {
+        const item = document.createElement('div');
+        item.className = 'item';
+        item.innerHTML = `
+          <div><strong>${e.desc}</strong></div>
+          <div>${e.price.toLocaleString('fa-IR')} تومان</div>
+          <div>ارسال: ${e.sent ? 'بله' : 'خیر'}</div>
+          <div>پرداخت: ${e.paid ? 'بله' : 'خیر'}</div>
+          <div class="actions">
+            <button onclick="editEngine(${i})">ویرایش</button>
+            <button class="delete" onclick="deleteEngine(${i})">حذف</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function addEngine() {
+      const desc = document.getElementById('new-engine-desc').value.trim();
+      const price = parseInt(document.getElementById('new-engine-price').value) || 0;
+      const sent = document.getElementById('new-engine-sent').value === 'true';
+      const paid = document.getElementById('new-engine-paid').value === 'true';
+      if (!desc || price <= 0) return alert('شرح و مبلغ معتبر وارد کنید');
+      const c = customers.find(x => x.id === currentCustomerId);
+      c.engines.push({ desc, price, sent, paid, date: Date.now() });
+      saveData();
+      renderEngines();
+      renderCustomers();
+      document.getElementById('new-engine-desc').value = '';
+      document.getElementById('new-engine-price').value = '';
+    }
+
+    function deleteEngine(idx) {
+      if (!confirm('مطمئن هستید؟')) return;
+      const c = customers.find(x => x.id === currentCustomerId);
+      c.engines.splice(idx, 1);
+      saveData();
+      renderEngines();
+      renderCustomers();
+    }
+
+    function editEngine(idx) {
+      const c = customers.find(x => x.id === currentCustomerId);
+      const e = c.engines[idx];
+      const newDesc = prompt('شرح جدید:', e.desc);
+      const newPrice = parseInt(prompt('مبلغ جدید:', e.price));
+      const newSent = confirm('ارسال شده است؟') ? true : false;
+      const newPaid = confirm('پرداخت شده است؟') ? true : false;
+      if (newDesc && !isNaN(newPrice) && newPrice > 0) {
+        c.engines[idx] = { ...e, desc: newDesc, price: newPrice, sent: newSent, paid: newPaid };
+        saveData();
+        renderEngines();
+        renderCustomers();
+      }
+    }
+
+    function prepareInvoice() {
+      const c = customers.find(x => x.id === currentCustomerId);
+      document.getElementById('inv-customer-name').textContent = c.name;
+      document.getElementById('inv-number').textContent = invoiceCounter++;
+      const tbody = document.getElementById('invoice-body');
+      tbody.innerHTML = '';
+      let total = 0;
+      c.engines.forEach((e, i) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${i+1}</td>
+          <td>${e.desc}</td>
+          <td>${e.price.toLocaleString('fa-IR')}</td>
+          <td>${e.sent ? 'بله' : 'خیر'}</td>
+          <td>${e.paid ? 'بله' : 'خیر'}</td>
+        `;
+        tbody.appendChild(row);
+        if (!e.paid) total += e.price;
+      });
+      document.getElementById('inv-total-debt').textContent = total.toLocaleString('fa-IR');
+      saveData();
+    }
+
+    function printInvoice() {
+      prepareInvoice();
+      document.getElementById('invoice').style.display = 'block';
+      window.print();
+      document.getElementById('invoice').style.display = 'none';
+    }
+
+    function saveAsImage() {
+      prepareInvoice();
+      const inv = document.getElementById('invoice');
+      inv.style.display = 'block';
+      html2canvas(inv, { scale: 2 }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `فاکتور_${document.getElementById('inv-number').textContent}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }).finally(() => {
+        inv.style.display = 'none';
+      });
+    }
+
+    function checkOverdue(customer) {
+      const tenDays = 10 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const hasOverdue = customer.engines.some(e => !e.paid && (now - e.date > tenDays));
+      if (hasOverdue) {
+        alert(`هشدار: مشتری «${customer.name}» بیش از ۱۰ روز بدهی پرداخت‌نشده دارد.`);
+      }
+    }
+
+    window.addEventListener('beforeunload', saveData);
+    renderCustomers();
+  </script>
+</body>
+</html>
